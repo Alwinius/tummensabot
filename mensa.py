@@ -83,7 +83,7 @@ def start(bot, update):
 def about(bot, update):
 	checkuser(0, update)
 	reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)
-	bot.sendMessage(chat_id=update.message.chat_id, text="Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter https://github.com/Brom2/tummensabot verfügbar.", reply_markup=reply_markup)	
+	bot.sendMessage(chat_id=update.message.chat_id, text="Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.", reply_markup=reply_markup)	
 	
 def echo(bot, update):
 	mensa=update.message.text
