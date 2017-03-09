@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, distinct
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
 from mensa_db import User, Base
+from telegram.error import (TelegramError, Unauthorized, 
+                            TimedOut, ChatMigrated, NetworkError)
 
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.bind = engine
@@ -14,7 +16,7 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 session = DBSession()
-entries=session.query(User).filter(User.notifications!=0)
+entries=session.query(User).filter(User.notifications>0)
 session.close()
 bot = telegram.Bot(token=config['DEFAULT']['BotToken'])
 
@@ -33,6 +35,26 @@ def getplan(url):
 			pass
 	return message
 
+def send(chat_id, message, reply_markup):	
+	try:
+		bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup)
+	except Unauthorized:
+		session = DBSession()
+		user=session.query(User).filter(User.id==chat_id).first()
+		user.notifications=-1
+		session.commit()
+		session.close()
+		return True
+	except (TimeOut, NetworkError):
+		return send(chat_id, message, reply_markup)
+	except ChatMigrated as e:
+		session = DBSession()
+		user=session.query(User).filter(User.id==user_id).first()
+		user.id=e.new_chat_id
+		session.commit()
+		session.close()
+		return True
+	
 urls=[421,422,411,412,423]
 contents=dict()
 for url in urls:
@@ -44,4 +66,4 @@ custom_keyboard=[["Mensa Arcisstraße"], ["Mensa Garching", "Mensa Leopoldstraß
 
 reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)	
 for entry in entries:
-	bot.sendMessage(chat_id=entry.id, text=contents[entry.notifications], reply_markup=reply_markup)
+	send(entry.id, contents[entry.notifications],reply_markup)
