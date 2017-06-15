@@ -15,6 +15,8 @@ class User(Base):
     notifications=Column(Integer(), nullable=False)
     current_selection = Column(String(255), nullable=True)
     user_group=Column(String(255), nullable=True)
+    counter=Column(Integer(), nullable=True)
+    message_id=Column(Integer(), nullable=True)
 
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.create_all(engine)	

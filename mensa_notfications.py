@@ -1,69 +1,101 @@
 #!/bin/python3
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
-import requests, telegram, configparser
-from sqlalchemy import create_engine, distinct
+import configparser
+from datetime import date
+from mensa_db import Base
+from mensa_db import User
+import requests
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import text
-from mensa_db import User, Base
-from telegram.error import (TelegramError, Unauthorized, 
-                            TimedOut, ChatMigrated, NetworkError)
+import telegram
+from telegram import InlineKeyboardButton
+from telegram.error import ChatMigrated
+from telegram.error import NetworkError
+from telegram.error import TimedOut
+from telegram.error import Unauthorized
 
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 config = configparser.ConfigParser()
 config.read('config.ini')
-
-session = DBSession()
-entries=session.query(User).filter(User.notifications>0)
-session.close()
 bot = telegram.Bot(token=config['DEFAULT']['BotToken'])
+day = date.today().isoformat()
 
 #acquire contents first
-def getplan(url):
-	r = requests.get(url)
-	soup = BeautifulSoup(r.content, "lxml")
-	cont = soup.select("a[name=heute]")
-	message=str(cont[0].string)+"\n"
-	cont=cont[0].parent.parent.parent.parent
-	meals=[]
-	for meal in cont:
-		try:
-			message+=str(meal.select(".stwm-artname")[0].string)+": "+str(meal.select(".beschreibung span")[0].getText())+"\n"
-		except (AttributeError, IndexError): 
-			pass
-	return message
+def getplan(day, mensa):
+    r = requests.get("http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day + "_" + str(mensa) + "_-de.html")
+    soup = BeautifulSoup(r.content, "lxml")
+    try:
+        message = soup.select(".heute_" + day + " span")[0].getText() + ":\n"
+        cont = soup.select(".c-schedule__list")
+    except IndexError:
+        message = ""
+    if message != "":
+        meals = []
+        for meal in cont[0].children:
+            try:
+                cat = meal.select(".stwm-artname")[0].string
+                if cat == None or cat == "Beilagen":
+                    break
+                message += str(cat) + ": " + str(meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)) + "\n"
+            except (AttributeError, IndexError): 
+                pass
+        return message
 
-def send(chat_id, message, reply_markup):	
-	try:
-		bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup)
-	except Unauthorized:
-		session = DBSession()
-		user=session.query(User).filter(User.id==chat_id).first()
-		user.notifications=-1
-		session.commit()
-		session.close()
-		return True
-	except (TimeOut, NetworkError):
-		return send(chat_id, message, reply_markup)
-	except ChatMigrated as e:
-		session = DBSession()
-		user=session.query(User).filter(User.id==user_id).first()
-		user.id=e.new_chat_id
-		session.commit()
-		session.close()
-		return True
+def send(chat_id, message_id, message, reply_markup):	
+    try:
+        if message_id == None or message_id == 0:
+            rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup)
+            session = DBSession()
+            user = session.query(User).filter(User.id == chat_id).first()
+            user.message_id = rep.message_id
+            session.commit()
+            session.close()
+            return True
+        else:
+            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup)
+            return True
+    except Unauthorized:
+        session = DBSession()
+        user = session.query(User).filter(User.id == chat_id).first()
+        user.notifications = -1
+        session.commit()
+        session.close()
+        return True
+    except (TimedOut, NetworkError):
+        import time
+        time.sleep(5) # delays for 5 seconds
+        return send(chat_id, message_id, message, reply_markup)
+    except ChatMigrated as e:
+        session = DBSession()
+        user = session.query(User).filter(User.id == user_id).first()
+        user.id = e.new_chat_id
+        session.commit()
+        session.close()
+        return True
+    else:
+        return False
 	
-urls=[421,422,411,412,423]
-contents=dict()
+urls = [421, 422, 411, 412, 423, 432]
+names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"), (432, "Pasing")])
+contents = dict()
 for url in urls:
-	contents[url]=getplan("http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_"+str(url)+"_-de.html")
+    contents[url] = getplan(day, url)
 
-custom_keyboard=[["Mensa Arcisstraße"], ["Mensa Garching", "Mensa Leopoldstraße"], ["Mensa Martinsried", "Mensa Weihenstephan"]]
+button_list = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")], [InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"), InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")], [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"), InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")], [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"), InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")]]
 
+reply_markup = telegram.InlineKeyboardMarkup(button_list)	
 
+session = DBSession()
+entries = session.query(User).filter(User.notifications > 0)
 
-reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard)	
 for entry in entries:
-	send(entry.id, contents[entry.notifications],reply_markup)
+    entry.counter += 1
+    session.commit()
+    try:
+        send(entry.id, entry.message_id, "Mensa " + names[entry.notifications] + ", " + contents[entry.notifications], reply_markup)
+    except TypeError:
+        pass
+session.close()
