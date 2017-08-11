@@ -34,6 +34,7 @@ names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, 
 
 def getplan(mensa):
     day = date.today()
+    counter = 0
     now = datetime.now()
     if now.hour > 15 and now.date().weekday() < 5:
         #nachmittags wochentags
@@ -41,8 +42,9 @@ def getplan(mensa):
     if day.isoweekday() in set((6, 7)): # falls nun wochenende ausgewählt nächsten Montag nehmen
         day += timedelta(days=8 - day.isoweekday())
     r = requests.get("http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day.isoformat() + "_" + str(mensa) + "_-de.html")
-    while r.status_code == 404:  #bei fehlenden Tagen immer weiter nächsten nehmen
+    while r.status_code == 404 and counter<20:  #bei fehlenden Tagen immer weiter nächsten nehmen
         day = day + timedelta(days=1)
+        counter+=1
         r = requests.get("http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day.isoformat() + "_" + str(mensa) + "_-de.html")
     soup = BeautifulSoup(r.content, "lxml")
     message = soup.select(".heute_" + day.isoformat() + " span")[0].getText() + ":\n"
