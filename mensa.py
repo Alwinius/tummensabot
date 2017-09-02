@@ -138,7 +138,7 @@ def start(bot, update):
 def about(bot, update):
     checkuser(0, update)
     reply_markup = telegram.InlineKeyboardMarkup(button_list)
-    send(bot, update.message.chat_id, None, "Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.", reply_markup)
+    send(bot, update.message.chat_id, None, "Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\nWeitere interessante Bots: \n - @tummoodlebot\n - @mydealz_bot", reply_markup)
 
 def AllInline(bot, update):
     args = update.callback_query.data.split("$")
