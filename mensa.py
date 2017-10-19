@@ -62,10 +62,8 @@ def getplan(mensa):
     for meal in cont[0].children:
         try:
             cat = meal.select(".stwm-artname")[0].string
-            if cat == None or cat == "Beilagen":
-                break
-            message += str(cat) + ": " + str(
-                meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)) + "\n"
+            message += str(cat) + ": " if cat is not None else "        "
+            message+= str(meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)) + "\n"
         except (AttributeError, IndexError):
             pass
     return message
