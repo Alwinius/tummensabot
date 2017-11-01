@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
 import configparser
@@ -57,15 +57,32 @@ def getplan(mensa):
             "http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day.isoformat() + "_" + str(
                 mensa) + "_-de.html")
     soup = BeautifulSoup(r.content, "lxml")
-    message = soup.select(".heute_" + day.isoformat() + " span")[0].getText() + ":\n"
+    message = soup.select(".heute_" + day.isoformat() + " span")[0].getText() + ":*\n\n"
     cont = soup.select(".c-schedule__list")
+    lastcat=""
     for meal in cont[0].children:
         try:
             cat = meal.select(".stwm-artname")[0].string
-            message += str(cat) + ": " if cat is not None else "        "
-            message+= str(meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)) + "\n"
+            if lastcat != cat and cat is not None:
+                message+="*"+cat+"*:\n"
+                lastcat=cat
+            mealname=meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)
+            message += "• " + mealname
+            a=meal.select(".c-schedule__icon span")
+            if len(a)>0:
+                if "vegan" in a[0]["class"]:
+                    message += " 🥑"
+                if "fleischlos"in a[0]["class"]:
+                    message += " 🥕"
+            meat=meal.select(".u-text-sup")
+            if "S" in meat[0].getText():
+                message += "🐷"
+            if "R" in meat[0].getText():
+                message += "🐄"
+            message+= "\n"
         except (AttributeError, IndexError):
             pass
+    message += "\n🥑 = vegan, 🥕 = vegetarisch\n🐷 = Schwein, 🐄 = Rind"
     return message
 
 
@@ -80,7 +97,7 @@ def send(bot, chat_id, message_id, message, reply_markup):
             session.close()
             return True
         else:
-            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup)
+            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             return True
     except Unauthorized:
         session = DBSession()
@@ -172,7 +189,7 @@ def AllInline(bot, update):
             custom_keyboard = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")]] + button_list
         reply_markup = telegram.InlineKeyboardMarkup(custom_keyboard)
         send(bot, update.callback_query.message.chat.id, update.callback_query.message.message_id,
-             "Mensa " + args[1] + " " + msg, reply_markup)
+             "*Mensa " + args[1] + " " + msg, reply_markup)
     elif int(args[0]) == 5 and len(args) > 1:
         # Benachrichtigungen ändern
         user = checkuser(0, update)

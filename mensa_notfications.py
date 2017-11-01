@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
 import configparser
@@ -34,13 +34,30 @@ def getplan(day, mensa):
         message = ""
     if message != "":
         meals = []
+        lastcat=""
         for meal in cont[0].children:
             try:
                 cat = meal.select(".stwm-artname")[0].string
-                message += str(cat) + ": " if cat is not None else "        "
-                message += str(meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)) + "\n"
-            except (AttributeError, IndexError): 
+                if lastcat != cat and cat is not None:
+                    message += "*" + cat + "*:\n"
+                    lastcat = cat
+                mealname = meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)
+                message += "• " + mealname
+                a = meal.select(".c-schedule__icon span")
+                if len(a) > 0:
+                    if "vegan" in a[0]["class"]:
+                        message += " 🥑"
+                    if "fleischlos" in a[0]["class"]:
+                        message += " 🥕"
+                meat = meal.select(".u-text-sup")
+                if "S" in meat[0].getText():
+                    message += "🐷"
+                if "R" in meat[0].getText():
+                    message += "🐄"
+                message += "\n"
+            except (AttributeError, IndexError):
                 pass
+        message+="\n🥑 = vegan, 🥕 = vegetarisch\n🐷 = Schwein, 🐄 = Rind"
         return message
 
 def send(chat_id, message_id, message, reply_markup):	
