@@ -63,7 +63,7 @@ def getplan(day, mensa):
 def send(chat_id, message_id, message, reply_markup):	
     try:
         if message_id == None or message_id == 0:
-            rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup)
+            rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             session = DBSession()
             user = session.query(User).filter(User.id == chat_id).first()
             user.message_id = rep.message_id
@@ -71,7 +71,7 @@ def send(chat_id, message_id, message, reply_markup):
             session.close()
             return True
         else:
-            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup)
+            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             return True
     except Unauthorized:
         session = DBSession()
