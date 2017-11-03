@@ -16,6 +16,7 @@ from telegram import InlineKeyboardButton
 from telegram.error import ChatMigrated
 from telegram.error import TimedOut
 from telegram.error import Unauthorized
+from telegram.error import BadRequest
 from telegram.ext import CallbackQueryHandler
 from telegram.ext import CommandHandler
 from telegram.ext import Filters
@@ -99,7 +100,7 @@ def send(bot, chat_id, message_id, message, reply_markup):
         else:
             bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             return True
-    except Unauthorized:
+    except (Unauthorized, BadRequest):
         session = DBSession()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1

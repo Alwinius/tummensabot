@@ -14,6 +14,7 @@ from telegram.error import ChatMigrated
 from telegram.error import NetworkError
 from telegram.error import TimedOut
 from telegram.error import Unauthorized
+from telegram.error import BadRequest
 
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.bind = engine
@@ -63,6 +64,7 @@ def getplan(day, mensa):
 def send(chat_id, message_id, message, reply_markup):	
     try:
         if message_id == None or message_id == 0:
+            print("Sending new message")
             rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             session = DBSession()
             user = session.query(User).filter(User.id == chat_id).first()
@@ -71,9 +73,10 @@ def send(chat_id, message_id, message, reply_markup):
             session.close()
             return True
         else:
+            print("Updating message")
             bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
             return True
-    except Unauthorized:
+    except (Unauthorized, BadRequest):
         session = DBSession()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1
@@ -86,7 +89,7 @@ def send(chat_id, message_id, message, reply_markup):
         return send(chat_id, message_id, message, reply_markup)
     except ChatMigrated as e:
         session = DBSession()
-        user = session.query(User).filter(User.id == user_id).first()
+        user = session.query(User).filter(User.id == chat_id).first()
         user.id = e.new_chat_id
         session.commit()
         session.close()
@@ -98,6 +101,7 @@ urls = [421, 422, 411, 412, 423, 432]
 names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"), (432, "Pasing")])
 contents = dict()
 for url in urls:
+    print("Getting plan from mensa "+names[url])
     contents[url] = getplan(day, url)
 
 button_list = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")], [InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"), InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")], [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"), InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")], [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"), InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")]]
@@ -111,6 +115,7 @@ for entry in entries:
     entry.counter += 1
     session.commit()
     try:
+        print("Sending plan to "+entry.first_name)
         send(entry.id, entry.message_id, "Mensa " + names[entry.notifications] + ", " + contents[entry.notifications], reply_markup)
     except TypeError:
         pass
