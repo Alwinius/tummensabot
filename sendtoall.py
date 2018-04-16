@@ -47,7 +47,7 @@ def send(bot, chat_id, message_id, message, reply_markup):
         return send(bot, chat_id, message_id, message, reply_markup)
     except ChatMigrated as e:
         session = DBSession()
-        user = session.query(User).filter(User.id == user_id).first()
+        user = session.query(User).filter(User.id == chat_id).first()
         user.id = e.new_chat_id
         session.commit()
         session.close()

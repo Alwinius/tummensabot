@@ -80,6 +80,7 @@ def send(chat_id, message_id, message, reply_markup):
         session = DBSession()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1
+        bot.sendMessage(chat_id=config["DEFAULT"]["AdminID"], text="Error sending meals to "+user.first_name)
         session.commit()
         session.close()
         return True

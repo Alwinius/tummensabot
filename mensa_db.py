@@ -17,6 +17,8 @@ class User(Base):
     user_group=Column(String(255), nullable=True)
     counter=Column(Integer(), nullable=True)
     message_id=Column(Integer(), nullable=True)
+    dailymsg=Column(String(5), nullable=True)
+    daily_selection=Column(Integer(), nullable=True)
 
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.create_all(engine)	

@@ -6,6 +6,7 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 import logging
+from re import match
 from mensa_db import Base
 from mensa_db import User
 import requests
@@ -29,7 +30,7 @@ config.read('config.ini')
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 button_list = [[InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"),
                 InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")],
                [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"),
@@ -98,7 +99,12 @@ def send(bot, chat_id, message_id, message, reply_markup):
             session.close()
             return True
         else:
-            bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+            rep=bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+            session = DBSession()
+            user = session.query(User).filter(User.id == chat_id).first()
+            user.message_id = rep.message_id
+            session.commit()
+            session.close()
             return True
     except (Unauthorized, BadRequest):
         session = DBSession()
@@ -174,7 +180,7 @@ def about(bot, update):
     reply_markup = telegram.InlineKeyboardMarkup(button_list)
     send(bot, update.message.chat_id, None,
          "Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter https://github.com/Alwinius/tummensabot "
-         "verfügbar.\nWeitere interessante Bots: \n - @tummoodlebot\n - @mydealz_bot",
+         "verfügbar.\nWeitere interessante Bots: \n - @tummoodlebot\n - @mydealz_bot\n - @tumroomsbot",
          reply_markup)
 
 
@@ -184,7 +190,7 @@ def AllInline(bot, update):
         # Speiseplan anzeigen
         user = checkuser(args[0], update)
         msg = getplan(args[0])
-        if int(user[0]) <= 0:
+        if int(user[0]) <= 0 or int(user[0])!=int(args[0]):
             custom_keyboard = [[InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")]] + button_list
         else:
             custom_keyboard = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")]] + button_list
@@ -211,6 +217,22 @@ def AllInline(bot, update):
         bot.sendMessage(text="Inlinekommando nicht erkannt.\n\nData: " + update.callback_query.data + "\n User: " + str(
             update.callback_query.message.chat), chat_id=config['DEFAULT']['AdminId'])
 
+def changedaily(bot, update):
+    checkuser(0, update)
+    st=update.message.text[5:]
+    if match(r"[0,1]{5}", st) is not None:
+        session = DBSession()
+        entry = session.query(User).filter(User.id == update.message.chat.id).first()
+        entry.dailymsg=st
+        entry.daily_selection=entry.current_selection if int(entry.current_selection) > 400 else 421
+        session.commit()
+        session.close()
+        reply_markup = telegram.InlineKeyboardMarkup(button_list)
+        bot.sendMessage(text="Auswahl gespeichert", chat_id=update.message.chat.id, reply_markup=reply_markup)
+    else:
+        reply_markup = telegram.InlineKeyboardMarkup(button_list)
+        bot.sendMessage(text="Falscher Input:"+st, chat_id=update.message.chat.id, reply_markup=reply_markup)
+
 
 updater = Updater(token=config['DEFAULT']['BotToken'])
 dispatcher = updater.dispatcher
@@ -220,8 +242,16 @@ about_handler = CommandHandler('about', about)
 dispatcher.add_handler(about_handler)
 inlinehandler = CallbackQueryHandler(AllInline)
 dispatcher.add_handler(inlinehandler)
+
+
+#der neue Handler für Thomas:
+thomas_handler = CommandHandler('set',changedaily)
+dispatcher.add_handler(thomas_handler)
+
 fallbackhandler = MessageHandler(Filters.all, start)
 dispatcher.add_handler(fallbackhandler)
+
+
 
 updater.start_webhook(listen='localhost', port=4215, webhook_url=config['DEFAULT']['WebhookUrl'])
 updater.idle()
