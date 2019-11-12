@@ -253,7 +253,9 @@ fallbackhandler = MessageHandler(Filters.all, start)
 dispatcher.add_handler(fallbackhandler)
 
 
-
-updater.start_webhook(listen='localhost', port=4215, webhook_url=config['DEFAULT']['WebhookUrl'])
+updater.start_webhook(
+    listen=config['DEFAULT'].get('Host', 'localhost'),
+    port=config['DEFAULT'].get('Port', 4215),
+    webhook_url=config['DEFAULT']['WebhookUrl'])
 updater.idle()
 updater.stop()
