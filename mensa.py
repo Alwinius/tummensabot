@@ -17,8 +17,9 @@ from mensa_db import User, Session
 
 logging.basicConfig(level=logging.DEBUG)
 
-config = configparser.ConfigParser()
-config.read('config.ini')
+parser = configparser.ConfigParser()
+parser.read('config.ini')
+config = parser['DEFAULT']
 
 
 def make_button_list():
@@ -81,8 +82,8 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
 
 
 def send_developer_message(bot: Bot, msg):
-    fallback = config['DEFAULT']['AdminId']
-    chat_ids = config['DEFAULT'].get('DeveloperIds', fallback).split(",")
+    fallback = config['AdminId']
+    chat_ids = config.get('DeveloperIds', fallback).split(",")
 
     for chat_id in chat_ids:
         bot.send_message(text=msg, chat_id=chat_id)
@@ -175,7 +176,7 @@ def inline_callback(update: Update, context: CallbackContext):
 
 
 def send_notifications():
-    bot = Bot(token=config['DEFAULT']['BotToken'])
+    bot = Bot(token=config['BotToken'])
 
     plans = {}
     for mensa_id, mensa_name in MENSEN.items():
@@ -200,7 +201,7 @@ def send_notifications():
 
 
 def main():
-    updater = Updater(token=config["DEFAULT"]["BotToken"], use_context=True)
+    updater = Updater(token=config["BotToken"], use_context=True)
     dispatcher = updater.dispatcher
 
     start_handler = CommandHandler('start', start)
@@ -212,11 +213,11 @@ def main():
     fallback_handler = MessageHandler(Filters.all, start)
     dispatcher.add_handler(fallback_handler)
 
-    webhook_url = config['DEFAULT'].get('WebhookUrl', "").strip()
+    webhook_url = config.get('WebhookUrl', "").strip()
     if len(webhook_url) > 0:
         updater.start_webhook(
-            listen=config['DEFAULT'].get('Host', 'localhost'),
-            port=config['DEFAULT'].get('Port', 4215),
+            listen=config.get('Host', 'localhost'),
+            port=config.get('Port', 4215),
             webhook_url=webhook_url)
     else:
         # use polling if no webhook is set
