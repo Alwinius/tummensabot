@@ -1,97 +1,56 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from bs4 import BeautifulSoup
+
+# @author Alwin Ebermann (alwin@alwin.net.au)
+# @author Markus Pielmeier
+
 import configparser
-from datetime import date
-from datetime import datetime
-from datetime import timedelta
 import logging
-from re import match
-from mensa_db import Base
-from mensa_db import User
-import requests
+from typing import List
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import telegram
-from telegram import InlineKeyboardButton
-from telegram.error import ChatMigrated
-from telegram.error import TimedOut
-from telegram.error import Unauthorized
-from telegram.error import BadRequest
-from telegram.ext import CallbackQueryHandler
-from telegram.ext import CommandHandler
-from telegram.ext import Filters
-from telegram.ext import MessageHandler
-from telegram.ext import Updater
+from telegram import Update, Chat, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton, Message, Bot
+from telegram.error import ChatMigrated, TimedOut, Unauthorized, BadRequest
+from telegram.ext import CallbackContext, Updater, CommandHandler, CallbackQueryHandler, Filters, MessageHandler
+
+from meals import MenuManager, MENSEN
+from mensa_db import Base, User
+
+logging.basicConfig(level=logging.DEBUG)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+# database
 engine = create_engine('sqlite:///mensausers.sqlite')
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-button_list = [[InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"),
-                InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")],
-               [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"),
-                InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")],
-               [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"),
-                InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")]]
-names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"),
-              (432, "Pasing")])
 
 
-def getplan(mensa):
-    day = date.today()
-    counter = 0
-    now = datetime.now()
-    if now.hour > 15 and now.date().weekday() < 5:
-        # nachmittags wochentags
-        day = day + timedelta(days=1)  # nächsten Tag anzeigen
-    if day.isoweekday() in set((6, 7)):  # falls nun wochenende ausgewählt nächsten Montag nehmen
-        day += timedelta(days=8 - day.isoweekday())
-    r = requests.get("http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day.isoformat() + "_" + str(
-        mensa) + "_-de.html")
-    while r.status_code == 404 and counter < 20:  # bei fehlenden Tagen immer weiter nächsten nehmen
-        day = day + timedelta(days=1)
-        counter += 1
-        r = requests.get(
-            "http://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_" + day.isoformat() + "_" + str(
-                mensa) + "_-de.html")
-    soup = BeautifulSoup(r.content, "lxml")
-    message = soup.select(".heute_" + day.isoformat() + " span")[0].getText() + ":*\n\n"
-    cont = soup.select(".c-schedule__list")
-    lastcat=""
-    for meal in cont[0].children:
-        try:
-            cat = meal.select(".stwm-artname")[0].string
-            if lastcat != cat and cat is not None:
-                message+="*"+cat+"*:\n"
-                lastcat=cat
-            mealname=meal.select(".js-schedule-dish-description")[0].find(text=True, recursive=False)
-            message += "• " + mealname
-            a=meal.select(".c-schedule__icon span")
-            if len(a)>0:
-                if "vegan" in a[0]["class"]:
-                    message += " 🥑"
-                if "fleischlos"in a[0]["class"]:
-                    message += " 🥕"
-            meat=meal.select(".u-text-sup")
-            if "S" in meat[0].getText():
-                message += "🐷"
-            if "R" in meat[0].getText():
-                message += "🐄"
-            message+= "\n"
-        except (AttributeError, IndexError):
-            pass
-    message += "\n🥑 = vegan, 🥕 = vegetarisch\n🐷 = Schwein, 🐄 = Rind"
-    return message
+def make_button_list():
+    arrangement = [(421, 411), (422, 412), (423, 432)]
+    rows = []
+    for row in arrangement:
+        row_btns = []
+        for mensa_id in row:
+            name = MENSEN[mensa_id]
+            row_btns.append(InlineKeyboardButton(name, callback_data=f"{mensa_id}${name}"))
+        rows.append(row_btns)
+    return rows
 
 
-def send(bot, chat_id, message_id, message, reply_markup):
+button_list = make_button_list()
+default_reply_markup = InlineKeyboardMarkup(button_list)
+
+menu_manager = MenuManager()
+
+
+def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=None):
     try:
-        if message_id == None or message_id == 0:
-            rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+        if message_id is None or message_id == 0:
+            rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup,
+                                  parse_mode=ParseMode.MARKDOWN)
             session = DBSession()
             user = session.query(User).filter(User.id == chat_id).first()
             user.message_id = rep.message_id
@@ -99,17 +58,19 @@ def send(bot, chat_id, message_id, message, reply_markup):
             session.close()
             return True
         else:
-            rep=bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+            rep=bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup,
+                                    parse_mode=ParseMode.MARKDOWN)
             session = DBSession()
             user = session.query(User).filter(User.id == chat_id).first()
             user.message_id = rep.message_id
             session.commit()
             session.close()
             return True
-    except (Unauthorized, BadRequest):
+    except (Unauthorized, BadRequest) as e:
         session = DBSession()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1
+        send_developer_message(bot, f"Error while sending message to {user.first_name} (#{chat_id})\n\n{e}")
         session.commit()
         session.close()
         return True
@@ -124,16 +85,18 @@ def send(bot, chat_id, message_id, message, reply_markup):
         session.commit()
         session.close()
         return True
-    else:
-        return False
 
 
-def checkuser(sel, update):
+def send_developer_message(bot: Bot, msg):
+    fallback = config['DEFAULT']['AdminId']
+    chat_ids = config['DEFAULT'].get('DeveloperIds', fallback).split(",")
+
+    for chat_id in chat_ids:
+        bot.send_message(text=msg, chat_id=chat_id)
+
+
+def checkuser(chat: Chat, sel=0):
     session = DBSession()
-    try:
-        chat = update.message.chat
-    except AttributeError:
-        chat = update.callback_query.message.chat
     entry = session.query(User).filter(User.id == chat.id).first()
     if not entry:
         # create entry
@@ -153,109 +116,122 @@ def checkuser(sel, update):
         return [noti, presel]
 
 
-def changenotifications(update, sel, task):
+def change_notifications(chat: Chat, mensa_id: int, enabled: bool):
     session = DBSession()
-    entry = session.query(User).filter(User.id == update.callback_query.message.chat.id).first()
-    if task == "1":
-        entry.notifications = sel
-        session.commit()
-        session.close()
-        return True
-    else:
-        entry.notifications = 0
-        session.commit()
-        session.close()
-        return False
+    user = session.query(User).filter(User.id == chat.id).first()
+    user.notifications = mensa_id if enabled else 0
+    session.commit()
+    session.close()
 
 
-def start(bot, update):
-    checkuser(0, update)
-    reply_markup = telegram.InlineKeyboardMarkup(button_list)
-    send(bot, update.message.chat_id, None,
-         "Bitte über das Menü eine Mensa wählen. Informationen über diesen Bot gibt's hier /about.", reply_markup)
+# Handlers
+def start(update: Update, context: CallbackContext):
+    checkuser(update.message.chat)
+    msg = "Bitte über das Menü eine Mensa wählen. Informationen über diesen Bot gibt's hier /about."
+    send(context.bot, update.message.chat_id, msg)
 
 
-def about(bot, update):
-    checkuser(0, update)
-    reply_markup = telegram.InlineKeyboardMarkup(button_list)
-    bot.sendMessage(chat_id=update.message.chat_id,
-                    text="Dieser Bot wurde erstellt von @Alwinius. Der Quellcode ist unter "
-                         "https://github.com/Alwinius/tummensabot verfügbar.\nWeitere interessante Bots: \n - "
-                         "@tummoodlebot\n - @mydealz_bot\n - @tumroomsbot",
-                    reply_markup=reply_markup)
+def about(update: Update, context: CallbackContext):
+    checkuser(update.message.chat)
+    msg = ("Dieser Bot wurde erstellt von @Alwinius, und wird weiterentwickelt von @markuspi.\n"
+           "Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\n"
+           "Weitere interessante Bots: \n - "
+           "@tummoodlebot\n - @mydealz_bot\n - @tumroomsbot")
+    print(msg)
+    send(context.bot, update.message.chat_id, msg)
 
 
-def AllInline(bot, update):
-    args = update.callback_query.data.split("$")
+def inline_callback(update: Update, context: CallbackContext):
+    message: Message = update.callback_query.message
+    args: List[str] = update.callback_query.data.split("$")
+
     if int(args[0]) > 400:
-        # Speiseplan anzeigen
-        user = checkuser(args[0], update)
-        msg = getplan(args[0])
-        if int(user[0]) <= 0 or int(user[0])!=int(args[0]):
-            custom_keyboard = [[InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")]] + button_list
+        # show mealplan
+        mensa_id, mensa_name = args
+        noti, presel = checkuser(message.chat, sel=mensa_id)
+
+        if int(noti) <= 0 or int(noti) != int(mensa_id):
+            noti_btn = InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")
         else:
-            custom_keyboard = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")]] + button_list
-        reply_markup = telegram.InlineKeyboardMarkup(custom_keyboard)
-        send(bot, update.callback_query.message.chat.id, update.callback_query.message.message_id,
-             "*Mensa " + args[1] + " " + msg, reply_markup)
+            noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
+
+        msg = menu_manager.get_menu(int(mensa_id)).get_meals_message()
+        reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+        send(context.bot, message.chat_id, msg, reply_markup=reply_markup, message_id=message.message_id)
     elif int(args[0]) == 5 and len(args) > 1:
-        # Benachrichtigungen ändern
-        user = checkuser(0, update)
-        if changenotifications(update, user[1], args[1]):
-            custom_keyboard = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")]] + button_list
-            reply_markup = telegram.InlineKeyboardMarkup(custom_keyboard)
-            send(bot, update.callback_query.message.chat.id, update.callback_query.message.message_id,
-                 "Auto-Update aktiviert für Mensa " + names[int(user[1])], reply_markup)
+        # manage notifications
+        noti, presel = checkuser(message.chat)
+        enabled = args[1] == "1"
+        change_notifications(message.chat, presel, enabled)
+
+        if enabled:
+            noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
+            msg = "Auto-Update aktiviert für Mensa " + MENSEN[int(presel)]
         else:
-            custom_keyboard = [[InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")]] + button_list
-            reply_markup = telegram.InlineKeyboardMarkup(custom_keyboard)
-            send(bot, update.callback_query.message.chat.id, update.callback_query.message.message_id,
-                 "Auto-Update deaktiviert", reply_markup)
-    else:
-        reply_markup = telegram.InlineKeyboardMarkup(button_list)
-        send(bot, update.callback_query.message.chat.id, update.callback_query.message.message_id,
-             "Kommando nicht erkannt", reply_markup)
-        bot.sendMessage(text="Inlinekommando nicht erkannt.\n\nData: " + update.callback_query.data + "\n User: " + str(
-            update.callback_query.message.chat), chat_id=config['DEFAULT']['AdminId'])
+            noti_btn = InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")
+            msg = "Auto-Update deaktiviert"
 
-def changedaily(bot, update):
-    checkuser(0, update)
-    st=update.message.text[5:]
-    if match(r"[0,1]{5}", st) is not None:
-        session = DBSession()
-        entry = session.query(User).filter(User.id == update.message.chat.id).first()
-        entry.dailymsg=st
-        entry.daily_selection=entry.current_selection if int(entry.current_selection) > 400 else 421
+        reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+        send(context.bot, message.chat_id, msg, reply_markup=reply_markup, message_id=message.message_id)
+    else:
+        logging.error("unknown inline command")
+        msg = "Kommando nicht erkannt"
+        send(context.bot, message.chat_id, msg)
+        dev_msg = f"Inlinekommando nicht erkannt.\n\nData: {update.callback_query.data}\nUser:{message.chat}"
+        send_developer_message(context.bot, dev_msg)
+
+
+def send_notifications():
+    bot = Bot(token=config['DEFAULT']['BotToken'])
+
+    plans = {}
+    for mensa_id, mensa_name in MENSEN.items():
+        print(f"Getting plan for {mensa_name} (#{mensa_id})")
+        plans[mensa_id] = menu_manager.get_menu(mensa_id)
+
+    noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
+    reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+
+    session = DBSession()
+    users = session.query(User).filter(User.notifications > 0)
+    for user in users:
+        user.counter += 1
         session.commit()
-        session.close()
-        reply_markup = telegram.InlineKeyboardMarkup(button_list)
-        bot.sendMessage(text="Auswahl gespeichert", chat_id=update.message.chat.id, reply_markup=reply_markup)
+        try:
+            print("Sending plan to", user.first_name)
+            send(bot, user.id, plans[int(user.notifications)], reply_markup=reply_markup, message_id=user.message_id)
+        except TypeError:
+            logging.exception(f"Caught TypeError while processing user {user.first_name}")
+
+    session.close()
+
+
+def main():
+    updater = Updater(token=config["DEFAULT"]["BotToken"], use_context=True)
+    dispatcher = updater.dispatcher
+
+    start_handler = CommandHandler('start', start)
+    dispatcher.add_handler(start_handler)
+    about_handler = CommandHandler('about', about)
+    dispatcher.add_handler(about_handler)
+    inline_handler = CallbackQueryHandler(inline_callback)
+    dispatcher.add_handler(inline_handler)
+    fallback_handler = MessageHandler(Filters.all, start)
+    dispatcher.add_handler(fallback_handler)
+
+    webhook_url = config['DEFAULT'].get('WebhookUrl', "").strip()
+    if len(webhook_url) > 0:
+        updater.start_webhook(
+            listen=config['DEFAULT'].get('Host', 'localhost'),
+            port=config['DEFAULT'].get('Port', 4215),
+            webhook_url=webhook_url)
     else:
-        reply_markup = telegram.InlineKeyboardMarkup(button_list)
-        bot.sendMessage(text="Falscher Input:"+st, chat_id=update.message.chat.id, reply_markup=reply_markup)
+        # use polling if no webhook is set
+        updater.start_polling()
+
+    updater.idle()
+    updater.stop()
 
 
-updater = Updater(token=config['DEFAULT']['BotToken'])
-dispatcher = updater.dispatcher
-start_handler = CommandHandler('start', start)
-dispatcher.add_handler(start_handler)
-about_handler = CommandHandler('about', about)
-dispatcher.add_handler(about_handler)
-inlinehandler = CallbackQueryHandler(AllInline)
-dispatcher.add_handler(inlinehandler)
-
-
-#der neue Handler für Thomas:
-thomas_handler = CommandHandler('set',changedaily)
-dispatcher.add_handler(thomas_handler)
-
-fallbackhandler = MessageHandler(Filters.all, start)
-dispatcher.add_handler(fallbackhandler)
-
-
-updater.start_webhook(
-    listen=config['DEFAULT'].get('Host', 'localhost'),
-    port=config['DEFAULT'].get('Port', 4215),
-    webhook_url=config['DEFAULT']['WebhookUrl'])
-updater.idle()
-updater.stop()
+if __name__ == '__main__':
+    main()

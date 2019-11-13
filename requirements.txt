@@ -2,3 +2,4 @@ sqlalchemy
 requests
 python-telegram-bot
 beautifulsoup4
+lxml
