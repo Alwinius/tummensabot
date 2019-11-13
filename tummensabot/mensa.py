@@ -4,7 +4,6 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
-import configparser
 import logging
 from typing import List
 
@@ -12,15 +11,11 @@ from telegram import Update, Chat, ParseMode, InlineKeyboardMarkup, InlineKeyboa
 from telegram.error import ChatMigrated, TimedOut, Unauthorized, BadRequest
 from telegram.ext import CallbackContext, Updater, CommandHandler, CallbackQueryHandler, Filters, MessageHandler
 
-from meals import MenuManager, MENSEN
-from mensa_db import User, Session
+from .meals import MenuManager, MENSEN
+from .db import User, Session
+from . import config
 
 logging.basicConfig(level=logging.DEBUG)
-
-parser = configparser.ConfigParser()
-parser.read('config.ini')
-config = parser['DEFAULT']
-
 
 def make_button_list():
     arrangement = [(421, 411), (422, 412), (423, 432)]
@@ -200,7 +195,7 @@ def send_notifications():
     session.close()
 
 
-def main():
+def run_daemon():
     updater = Updater(token=config["BotToken"], use_context=True)
     dispatcher = updater.dispatcher
 
@@ -226,6 +221,3 @@ def main():
     updater.idle()
     updater.stop()
 
-
-if __name__ == '__main__':
-    main()

@@ -4,8 +4,10 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
+from . import DB_FILE
+
 Base = declarative_base()
-engine = create_engine('sqlite:///mensausers.sqlite')
+engine = create_engine('sqlite:///' + DB_FILE)
 Session = sessionmaker(bind=engine)
 
 

@@ -1,3 +1,3 @@
 #!/bin/sh
 cd $(dirname "$0")
-python3 main.py daemon
+python3 main.py notifications
