@@ -8,24 +8,17 @@ import configparser
 import logging
 from typing import List
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from telegram import Update, Chat, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton, Message, Bot
 from telegram.error import ChatMigrated, TimedOut, Unauthorized, BadRequest
 from telegram.ext import CallbackContext, Updater, CommandHandler, CallbackQueryHandler, Filters, MessageHandler
 
 from meals import MenuManager, MENSEN
-from mensa_db import Base, User
+from mensa_db import User, Session
 
 logging.basicConfig(level=logging.DEBUG)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
-
-# database
-engine = create_engine('sqlite:///mensausers.sqlite')
-Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
 
 
 def make_button_list():
@@ -51,23 +44,23 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
         if message_id is None or message_id == 0:
             rep = bot.sendMessage(chat_id=chat_id, text=message, reply_markup=reply_markup,
                                   parse_mode=ParseMode.MARKDOWN)
-            session = DBSession()
+            session = Session()
             user = session.query(User).filter(User.id == chat_id).first()
             user.message_id = rep.message_id
             session.commit()
             session.close()
             return True
         else:
-            rep=bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup,
-                                    parse_mode=ParseMode.MARKDOWN)
-            session = DBSession()
+            rep = bot.editMessageText(chat_id=chat_id, text=message, message_id=message_id, reply_markup=reply_markup,
+                                      parse_mode=ParseMode.MARKDOWN)
+            session = Session()
             user = session.query(User).filter(User.id == chat_id).first()
             user.message_id = rep.message_id
             session.commit()
             session.close()
             return True
     except (Unauthorized, BadRequest) as e:
-        session = DBSession()
+        session = Session()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1
         send_developer_message(bot, f"Error while sending message to {user.first_name} (#{chat_id})\n\n{e}")
@@ -79,7 +72,7 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
         time.sleep(50)  # delays for 5 seconds
         return send(bot, chat_id, message_id, message, reply_markup)
     except ChatMigrated as e:
-        session = DBSession()
+        session = Session()
         user = session.query(User).filter(User.id == chat_id).first()
         user.id = e.new_chat_id
         session.commit()
@@ -96,7 +89,7 @@ def send_developer_message(bot: Bot, msg):
 
 
 def checkuser(chat: Chat, sel=0):
-    session = DBSession()
+    session = Session()
     entry = session.query(User).filter(User.id == chat.id).first()
     if not entry:
         # create entry
@@ -117,7 +110,7 @@ def checkuser(chat: Chat, sel=0):
 
 
 def change_notifications(chat: Chat, mensa_id: int, enabled: bool):
-    session = DBSession()
+    session = Session()
     user = session.query(User).filter(User.id == chat.id).first()
     user.notifications = mensa_id if enabled else 0
     session.commit()
@@ -136,7 +129,7 @@ def about(update: Update, context: CallbackContext):
     msg = ("Dieser Bot wurde erstellt von @Alwinius, und wird weiterentwickelt von @markuspi.\n"
            "Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\n"
            "Weitere interessante Bots: \n - "
-           "@tummoodlebot\n - @mydealz_bot\n - @tumroomsbot")
+           "@tummoodlebot\n - @mydealz\_bot\n - @tumroomsbot")
     print(msg)
     send(context.bot, update.message.chat_id, msg)
 
@@ -192,14 +185,14 @@ def send_notifications():
     noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
     reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
 
-    session = DBSession()
+    session = Session()
     users = session.query(User).filter(User.notifications > 0)
     for user in users:
         user.counter += 1
         session.commit()
         try:
             print("Sending plan to", user.first_name)
-            send(bot, user.id, plans[int(user.notifications)], reply_markup=reply_markup, message_id=user.message_id)
+            send(bot, user.id, plans[int(user.notifications)].get_meals_message(), reply_markup=reply_markup, message_id=user.message_id)
         except TypeError:
             logging.exception(f"Caught TypeError while processing user {user.first_name}")
 
