@@ -55,10 +55,10 @@ class Meal:
 
 
 class Menu:
-    def __init__(self, mensa_id: int, date: str):
+    def __init__(self, mensa_id: int, day: str):
         self.mensa = MENSEN.get(mensa_id, "???")
         self.meals = []
-        self.date = date
+        self.day = day
 
     def add_meal(self, meal: Meal):
         self.meals.append(meal)
@@ -74,18 +74,15 @@ class Menu:
                 meals.append(meal)
         return meals
 
-    def get_date(self):
-        return self.date
-
     def get_meals_message(self, filter_mode: str = "none"):
         if self.is_closed():
-            return f"{self.mensa} ist am {self.date} geschlossen"
+            return f"{self.mensa} ist am {self.day} geschlossen"
 
         filtered = self.get_meals(filter_mode)
         if len(filtered) == 0:
             return "Keine Essen entsprechen dem gewählten Filter."
 
-        out = f"*{self.mensa}* am *{self.date}*\n"
+        out = f"*{self.mensa}* am *{self.day}*\n"
 
         last_typ = None
         for meal in self.meals:
@@ -166,4 +163,3 @@ class MenuManager:
                     meal.add_category(Category.BEEF)
             menu.add_meal(meal)
         return menu
-

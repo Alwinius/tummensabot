@@ -17,6 +17,7 @@ from . import config
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 def make_button_list():
     arrangement = [(421, 411), (422, 412), (423, 432)]
     rows = []
@@ -125,7 +126,7 @@ def about(update: Update, context: CallbackContext):
     msg = ("Dieser Bot wurde erstellt von @Alwinius, und wird weiterentwickelt von @markuspi.\n"
            "Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\n"
            "Weitere interessante Bots: \n - "
-           "@tummoodlebot\n - @mydealz\_bot\n - @tumroomsbot")
+           "@tummoodlebot\n - @mydealz\\_bot\n - @tumroomsbot")
     print(msg)
     send(context.bot, update.message.chat_id, msg)
 
@@ -188,7 +189,8 @@ def send_notifications():
         session.commit()
         try:
             print("Sending plan to", user.first_name)
-            send(bot, user.id, plans[int(user.notifications)].get_meals_message(), reply_markup=reply_markup, message_id=user.message_id)
+            send(bot, user.id, plans[int(user.notifications)].get_meals_message(),
+                 reply_markup=reply_markup, message_id=user.message_id)
         except TypeError:
             logging.exception(f"Caught TypeError while processing user {user.first_name}")
 
@@ -220,4 +222,3 @@ def run_daemon():
 
     updater.idle()
     updater.stop()
-
