@@ -99,13 +99,13 @@ def send(chat_id, message_id, message, reply_markup):
         return False
 	
 urls = [421, 422, 411, 412, 423, 432, 424]
-names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"), (432, "Pasing"), (424, "Oettinger")])
+names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"), (432, "Pasing"), (424, "Oettingen")])
 contents = dict()
 for url in urls:
     print("Getting plan from mensa "+names[url])
     contents[url] = getplan(day, url)
 
-button_list = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")], [InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"), InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")], [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"), InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")], [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"), InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")], [InlineKeyboardButton("StuBistro Oettingerstraße", callback_data="424$Oettinger")]]
+button_list = [[InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")], [InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcisstr"), InlineKeyboardButton("Mensa Leopoldstr.", callback_data="411$Leopoldstr")], [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"), InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")], [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"), InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")], [InlineKeyboardButton("StuBistro Oettingenstraße", callback_data="424$Oettingen")]]
 
 reply_markup = telegram.InlineKeyboardMarkup(button_list)	
 
