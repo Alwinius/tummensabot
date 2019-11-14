@@ -36,9 +36,10 @@ button_list = [[InlineKeyboardButton("Mensa Arcisstr.", callback_data="421$Arcis
                [InlineKeyboardButton("Mensa Garching", callback_data="422$Garching"),
                 InlineKeyboardButton("Mensa Martinsried", callback_data="412$Martinsried")],
                [InlineKeyboardButton("Mensa Weihenstephan", callback_data="423$Weihenstephan"),
-                InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")]]
+                InlineKeyboardButton("Mensa Pasing", callback_data="432$Pasing")],
+               [InlineKeyboardButton("StuBistro Oettingenstraße", callback_data="424$Oettingen")]]
 names = dict([(421, "Arcisstr"), (422, "Garching"), (411, "Leopoldstr."), (412, "Martinsried"), (423, "Weihenstephan"),
-              (432, "Pasing")])
+              (432, "Pasing"), (424, "Oettingen")])
 
 
 def getplan(mensa):
