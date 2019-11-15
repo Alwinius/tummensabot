@@ -4,4 +4,4 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 COPY . /app
 EXPOSE 4215
-CMD [ "python", "mensa.py" ]
+CMD [ "python", "main.py", "daemon" ]
