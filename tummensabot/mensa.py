@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 def make_button_list():
-    arrangement = [(421, 411), (422, 412), (423, 432)]
+    arrangement = [(421, 411), (422, 412), (423, 432), (424,)]
     rows = []
     for row in arrangement:
         row_btns = []

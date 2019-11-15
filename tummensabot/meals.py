@@ -16,7 +16,8 @@ MENSEN = {
     422: "Mensa Garching",
     412: "Mensa Martinsried",
     423: "Mensa Weihenstephan",
-    432: "Mensa Pasing"
+    432: "Mensa Pasing",
+    424: "StuBistro Oettingenstr."
 }
 
 MEAL_URL_TEMPLATE = "https://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_{date}_{id}_-de.html"
