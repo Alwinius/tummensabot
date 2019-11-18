@@ -58,9 +58,13 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
             session.close()
             return True
     except (Unauthorized, BadRequest) as e:
+        if "Message is not modified" in e.message:
+            # user clicked on same button twice, not an issue
+            return True
         session = Session()
         user = session.query(User).filter(User.id == chat_id).first()
         user.notifications = -1
+        logging.exception(f"Error while sending message to {user.first_name} (#{chat_id})")
         send_developer_message(bot, f"Error while sending message to {user.first_name} (#{chat_id})\n\n{e}")
         session.commit()
         session.close()
