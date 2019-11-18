@@ -4,6 +4,7 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
+import datetime
 import logging
 from typing import List
 
@@ -15,7 +16,7 @@ from .meals import MenuManager, MENSEN
 from .db import User, Session
 from . import config
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 
 def make_button_list():
@@ -171,8 +172,9 @@ def inline_callback(update: Update, context: CallbackContext):
         send_developer_message(context.bot, dev_msg)
 
 
-def send_notifications():
-    bot = Bot(token=config['BotToken'])
+def send_notifications(bot=None):
+    if bot is None:
+        bot = Bot(token=config['BotToken'])
 
     plans = {}
     for mensa_id, mensa_name in MENSEN.items():
@@ -197,6 +199,11 @@ def send_notifications():
     session.close()
 
 
+def job_callback(context: CallbackContext):
+    logging.debug("Scheduled notification update triggered")
+    send_notifications(bot=context.bot)
+
+
 def run_daemon():
     updater = Updater(token=config["BotToken"], use_context=True)
     dispatcher = updater.dispatcher
@@ -209,6 +216,13 @@ def run_daemon():
     dispatcher.add_handler(inline_handler)
     fallback_handler = MessageHandler(Filters.all, start)
     dispatcher.add_handler(fallback_handler)
+
+    # schedule daily update
+    hour = int(config.get('NotificationHour', 16))
+    first = datetime.time(hour=hour, minute=0)
+    now = datetime.datetime.now()
+    logging.info(f"Job will run daily at {first}. Server time is {now.strftime('%H:%M:%S')}.")
+    updater.job_queue.run_daily(job_callback, time=first)
 
     webhook_url = config.get('WebhookUrl', "").strip()
     if len(webhook_url) > 0:

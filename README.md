@@ -7,7 +7,7 @@
 * copy `config.example.ini` to `config.ini` and enter bot details
 
 ## Running
-**Start bot daemon:**
+**Start bot daemon**
 
 ```bash
 python3 main.py daemon
@@ -15,8 +15,11 @@ python3 main.py daemon
 ./mensa_daemon.sh
 ```
 
-**Send notifications:**
+Daemon will automatically send notifications every 24 hours.
 
+**Manually send notifications**
+
+Manually trigger notifications for testing purposes. Gets triggered by daemon every day anyway.
 ```bash
 python3 main.py notifications
 # or
