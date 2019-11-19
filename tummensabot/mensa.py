@@ -4,6 +4,7 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
+import time
 import datetime
 import logging
 from typing import List
@@ -70,8 +71,7 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
         session.close()
         return True
     except TimedOut:
-        import time
-        time.sleep(50)  # delays for 5 seconds
+        time.sleep(5)  # delays for 5 seconds
         return send(bot, chat_id, message_id, message, reply_markup)
     except ChatMigrated as e:
         session = Session()
@@ -131,7 +131,7 @@ def about(update: Update, context: CallbackContext):
     msg = ("Dieser Bot wurde erstellt von @Alwinius, und wird weiterentwickelt von @markuspi.\n"
            "Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\n"
            "Weitere interessante Bots: \n - "
-           "@tummoodlebot\n - @mydealz\\_bot\n - @tumroomsbot")
+           "@tummoodlebot\n - @mydealz\\_bot\n - @tumroomsbot\n - @aachenmensabot")
     print(msg)
     send(context.bot, update.message.chat_id, msg)
 
@@ -230,6 +230,7 @@ def run_daemon():
 
     webhook_url = config.get('WebhookUrl', "").strip()
     if len(webhook_url) > 0:
+        updater.bot.set_webhook(webhook_url)
         updater.start_webhook(
             listen=config.get('Host', 'localhost'),
             port=config.get('Port', 4215),

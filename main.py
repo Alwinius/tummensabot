@@ -8,7 +8,7 @@ from tummensabot import mensa
 def usage():
     print("TUMMensaBot")
     print(f"Usage: {sys.argv[0]} <daemon|notifications>", file=sys.stderr)
-    sys.exit(-1)
+    sys.exit(1)
 
 
 if __name__ == '__main__':
@@ -23,4 +23,4 @@ if __name__ == '__main__':
         usage()
     else:
         print("Unknown parameter:", sys.argv[1], file=sys.stderr)
-        sys.exit(-1)
+        sys.exit(1)
