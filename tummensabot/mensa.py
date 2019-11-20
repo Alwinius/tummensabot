@@ -92,23 +92,26 @@ def send_developer_message(bot: Bot, msg):
 
 def checkuser(chat: Chat, sel=0):
     session = Session()
-    entry = session.query(User).filter(User.id == chat.id).first()
+    entry: User = session.query(User).filter(User.id == chat.id).first()
     if not entry:
         # create entry
         new_user = User(id=chat.id, first_name=chat.first_name, last_name=chat.last_name, username=chat.username,
                         title=chat.title, notifications=0, current_selection="0", counter=0)
         session.add(new_user)
-        session.commit()
-        session.close()
-        return [0, 0]
+        ret = [0, 0]
     else:
-        entry.current_selection = sel if sel != 0 else entry.current_selection
-        presel = entry.current_selection
+        if sel != 0:
+            entry.current_selection = sel
         entry.counter += 1
-        noti = entry.notifications
-        session.commit()
-        session.close()
-        return [noti, presel]
+        # update user data
+        entry.first_name = chat.first_name
+        entry.last_name = chat.last_name
+        entry.username = chat.username
+        entry.title = chat.title
+        ret = [entry.notifications, entry.current_selection]
+    session.commit()
+    session.close()
+    return ret
 
 
 def change_notifications(chat: Chat, mensa_id: int, enabled: bool):
