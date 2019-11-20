@@ -183,6 +183,8 @@ def send_notifications(bot=None):
     if bot is None:
         bot = Bot(token=config['BotToken'])
 
+    # clear cache to ensure latest results
+    menu_manager.clear_cache()
     plans = {}
     for mensa_id, mensa_name in MENSEN.items():
         print(f"Getting plan for {mensa_name} (#{mensa_id})")

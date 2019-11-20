@@ -9,6 +9,7 @@ from enum import Enum
 
 import requests
 from bs4 import BeautifulSoup
+from expiringdict import ExpiringDict
 
 MENSEN = {
     421: "Mensa Arcisstr.",
@@ -109,9 +110,36 @@ class Menu:
 
 
 class MenuManager:
+    """Responsible for retrieving menus. Caches up to 10 entries for up to 1 hour."""
+
+    def __init__(self):
+        self.cache = ExpiringDict(max_len=10, max_age_seconds=60 * 60)
+
+    def clear_cache(self):
+        self.cache.clear()
+
+    def get_menu(self, mensa_id: int):
+        initial_day = self.get_day()
+        # cache is indexed by mensa and initial day
+        cache_key = (mensa_id, initial_day.isoformat())
+
+        menu, age = self.cache.get(cache_key, default=None, with_age=True)
+        if menu:
+            # cache hit
+            print(f"Using cached menu, age: {age:.0f} seconds")
+            return menu
+
+        # cache miss
+        content, day = self.download_menu(mensa_id, initial_day)
+        if content is None:
+            return None
+        # store in cache
+        menu = self.parse_menu(content, mensa_id, day)
+        self.cache[cache_key] = menu
+        return menu
 
     @staticmethod
-    def download_next_menu(mensa_id):
+    def get_day():
         now = datetime.now()
         day = date.today()
 
@@ -123,6 +151,11 @@ class MenuManager:
             # afternoon during workdays
             # show next day
             day += timedelta(days=1)
+        return day
+
+    @staticmethod
+    def download_menu(mensa_id: int, initial_day: date):
+        day = initial_day
 
         for _ in range(20):
             url = MEAL_URL_TEMPLATE.format(date=day.isoformat(), id=mensa_id)
@@ -138,8 +171,8 @@ class MenuManager:
                 r.raise_for_status()
         return None, None
 
-    def get_menu(self, mensa_id: int):
-        content, day = self.download_next_menu(mensa_id)
+    @staticmethod
+    def parse_menu(content: bytes, mensa_id: int, day: date):
         soup = BeautifulSoup(content, "lxml")
 
         menu = Menu(mensa_id, day.strftime("%d.%m.%Y"))
