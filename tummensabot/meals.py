@@ -18,7 +18,19 @@ MENSEN = {
     412: "Mensa Martinsried",
     423: "Mensa Weihenstephan",
     432: "Mensa Pasing",
-    424: "StuBistro Oettingenstr."
+
+    450: "StuBistro Arcisstr.",
+    418: "StuBistro Goethestr.",
+    455: "StuBistro Akademiestr.",
+    415: "StuBistro Martinsried",
+    416: "StuBistro Schellingstr.",
+    424: "StuBistro Oettingenstr.",
+
+    512: "StuCafé Adalbertstr.",
+    526: "StuCafé Akademie",
+    527: "StuCafé Bolzmannstr.",
+    524: "StuCafé Garching",
+    532: "StuCafé Karlstr."
 }
 
 MEAL_URL_TEMPLATE = "https://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_{date}_{id}_-de.html"
@@ -110,10 +122,10 @@ class Menu:
 
 
 class MenuManager:
-    """Responsible for retrieving menus. Caches up to 10 entries for up to 1 hour."""
+    """Responsible for retrieving menus. Caches up to 20 entries for up to 1 hour."""
 
     def __init__(self):
-        self.cache = ExpiringDict(max_len=10, max_age_seconds=60 * 60)
+        self.cache = ExpiringDict(max_len=20, max_age_seconds=60 * 60)
 
     def clear_cache(self):
         self.cache.clear()

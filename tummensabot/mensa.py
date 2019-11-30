@@ -19,21 +19,51 @@ from . import config
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
+nav_pages = [
+    [(421, 411), (422, 412), (423, 432)],  # Mensa
+    [(450, 418), (455, 415), (416, 424)],  # StuBistro
+    [(512, 526), (527, 524), (532,)]  # StuCafé
+]
 
-def make_button_list():
-    arrangement = [(421, 411), (422, 412), (423, 432), (424,)]
+nav_page_titles = [
+    "Mensa", "StuBistro", "StuCafé"
+]
+
+
+def get_page_by_id(mensa_id: int):
+    for page, content in enumerate(nav_pages):
+        for row in content:
+            if mensa_id in row:
+                return page
+    return 0
+
+
+def make_inline_markup(page=0, show_noti_btn=False, enable=True):
+    arrangement = nav_pages[page]
     rows = []
+    if show_noti_btn:
+        if enable:
+            noti_btn = InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")
+        else:
+            noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
+        rows.append([noti_btn])
+
     for row in arrangement:
         row_btns = []
         for mensa_id in row:
             name = MENSEN[mensa_id]
             row_btns.append(InlineKeyboardButton(name, callback_data=f"{mensa_id}${name}"))
         rows.append(row_btns)
-    return rows
+    prev_page = (page - 1) % len(nav_pages)
+    next_page = (page + 1) % len(nav_pages)
+    rows.append([
+        InlineKeyboardButton("<<", callback_data=f"page${prev_page}"),
+        InlineKeyboardButton(">>", callback_data=f"page${next_page}")
+    ])
+    return InlineKeyboardMarkup(rows)
 
 
-button_list = make_button_list()
-default_reply_markup = InlineKeyboardMarkup(button_list)
+default_reply_markup = make_inline_markup()
 
 menu_manager = MenuManager()
 
@@ -72,7 +102,7 @@ def send(bot, chat_id, message, reply_markup=default_reply_markup, message_id=No
         return True
     except TimedOut:
         time.sleep(5)  # delays for 5 seconds
-        return send(bot, chat_id, message_id, message, reply_markup)
+        return send(bot, chat_id, message, reply_markup, message_id)
     except ChatMigrated as e:
         session = Session()
         user = session.query(User).filter(User.id == chat_id).first()
@@ -108,7 +138,7 @@ def checkuser(chat: Chat, sel=0):
         entry.last_name = chat.last_name
         entry.username = chat.username
         entry.title = chat.title
-        ret = [entry.notifications, entry.current_selection]
+        ret = [int(entry.notifications), int(entry.current_selection)]
     session.commit()
     session.close()
     return ret
@@ -143,18 +173,29 @@ def inline_callback(update: Update, context: CallbackContext):
     message: Message = update.callback_query.message
     args: List[str] = update.callback_query.data.split("$")
 
-    if int(args[0]) > 400:
+    if args[0] == "page":
+        # change page
+        page = int(args[1])
+        noti, presel = checkuser(message.chat)
+
+        msg = f"Seite {page+1} / {len(nav_pages)}\n"
+        for i, title in enumerate(nav_page_titles):
+            icon = "▪️" if i == page else "▫"
+            msg += f"\n{icon} {title}"
+
+        show_enable = noti <= 0 or noti != presel
+        reply_markup = make_inline_markup(page=page, show_noti_btn=True, enable=show_enable)
+        send(context.bot, message.chat_id, msg, reply_markup=reply_markup, message_id=message.message_id)
+    elif int(args[0]) > 400:
         # show mealplan
         mensa_id, mensa_name = args
+        page = get_page_by_id(int(mensa_id))
         noti, presel = checkuser(message.chat, sel=mensa_id)
 
-        if int(noti) <= 0 or int(noti) != int(mensa_id):
-            noti_btn = InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")
-        else:
-            noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
-
         msg = menu_manager.get_menu(int(mensa_id)).get_meals_message()
-        reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+
+        show_enable = noti <= 0 or noti != presel
+        reply_markup = make_inline_markup(page=page, show_noti_btn=True, enable=show_enable)
         send(context.bot, message.chat_id, msg, reply_markup=reply_markup, message_id=message.message_id)
     elif int(args[0]) == 5 and len(args) > 1:
         # manage notifications
@@ -163,13 +204,11 @@ def inline_callback(update: Update, context: CallbackContext):
         change_notifications(message.chat, presel, enabled)
 
         if enabled:
-            noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
-            msg = "Auto-Update aktiviert für Mensa " + MENSEN[int(presel)]
+            msg = "Auto-Update aktiviert für " + MENSEN[presel]
         else:
-            noti_btn = InlineKeyboardButton("Auto-Update aktivieren", callback_data="5$1")
             msg = "Auto-Update deaktiviert"
 
-        reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+        reply_markup = make_inline_markup(page=get_page_by_id(presel), show_noti_btn=True, enable=not enabled)
         send(context.bot, message.chat_id, msg, reply_markup=reply_markup, message_id=message.message_id)
     else:
         logging.error("unknown inline command")
@@ -190,8 +229,7 @@ def send_notifications(bot=None):
         print(f"Getting plan for {mensa_name} (#{mensa_id})")
         plans[mensa_id] = menu_manager.get_menu(mensa_id)
 
-    noti_btn = InlineKeyboardButton("Auto-Update deaktivieren", callback_data="5$0")
-    reply_markup = InlineKeyboardMarkup([[noti_btn]] + button_list)
+    reply_markup = make_inline_markup(show_noti_btn=True, enable=False)
 
     session = Session()
     users = session.query(User).filter(User.notifications > 0)
