@@ -173,6 +173,9 @@ def inline_callback(update: Update, context: CallbackContext):
     message: Message = update.callback_query.message
     args: List[str] = update.callback_query.data.split("$")
 
+    # this will stop loading indicators
+    context.bot.answer_callback_query(update.callback_query.id)
+
     if args[0] == "page":
         # change page
         page = int(args[1])
