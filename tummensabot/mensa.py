@@ -4,18 +4,18 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
-import time
 import datetime
 import logging
+import time
 from typing import List
 
 from telegram import Update, Chat, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton, Message, Bot
 from telegram.error import ChatMigrated, TimedOut, Unauthorized, BadRequest
 from telegram.ext import CallbackContext, Updater, CommandHandler, CallbackQueryHandler, Filters, MessageHandler
 
-from .meals import MenuManager, MENSEN
-from .db import User, Session
 from . import config
+from .db import User, Session
+from .meals import MenuManager, MENSEN
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
@@ -165,7 +165,6 @@ def about(update: Update, context: CallbackContext):
            "Der Quellcode ist unter https://github.com/Alwinius/tummensabot verfügbar.\n"
            "Weitere interessante Bots: \n - "
            "@tummoodlebot\n - @mydealz\\_bot\n - @tumroomsbot\n - @aachenmensabot")
-    print(msg)
     send(context.bot, update.message.chat_id, msg)
 
 
@@ -229,7 +228,7 @@ def send_notifications(bot=None):
     menu_manager.clear_cache()
     plans = {}
     for mensa_id, mensa_name in MENSEN.items():
-        print(f"Getting plan for {mensa_name} (#{mensa_id})")
+        logging.debug(f"Getting plan for {mensa_name} (#{mensa_id})")
         plans[mensa_id] = menu_manager.get_menu(mensa_id)
 
     reply_markup = make_inline_markup(show_noti_btn=True, enable=False)
@@ -240,7 +239,7 @@ def send_notifications(bot=None):
         user.counter += 1
         session.commit()
         try:
-            print("Sending plan to", user.first_name)
+            logging.debug(f"Sending plan to {user.first_name}")
             send(bot, user.id, plans[int(user.notifications)].get_meals_message(),
                  reply_markup=reply_markup, message_id=user.message_id)
         except TypeError:

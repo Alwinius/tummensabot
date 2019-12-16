@@ -6,8 +6,7 @@ from tummensabot import mensa
 
 
 def usage():
-    print("TUMMensaBot")
-    print(f"Usage: {sys.argv[0]} <daemon|notifications>", file=sys.stderr)
+    print(f"TUMMensaBot\nUsage: {sys.argv[0]} <daemon|notifications>", file=sys.stderr)
     sys.exit(1)
 
 

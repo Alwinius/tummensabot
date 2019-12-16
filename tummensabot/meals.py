@@ -4,6 +4,7 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
+import logging
 from datetime import datetime, timedelta, date
 from enum import Enum
 
@@ -171,7 +172,7 @@ class MenuManager:
 
         for _ in range(20):
             url = MEAL_URL_TEMPLATE.format(date=day.isoformat(), id=mensa_id)
-            print("downloading", url)
+            logging.debug(f"Downloading {url}")
             r = requests.get(url)
 
             if r.status_code == 200:
