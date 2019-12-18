@@ -127,5 +127,6 @@ dmypy.json
 
 # custom rules
 .idea/
+.vscode/
 *.sqlite
 config.ini

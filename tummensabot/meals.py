@@ -4,11 +4,13 @@
 # @author Alwin Ebermann (alwin@alwin.net.au)
 # @author Markus Pielmeier
 
+import logging
 from datetime import datetime, timedelta, date
 from enum import Enum
 
 import requests
 from bs4 import BeautifulSoup
+from expiringdict import ExpiringDict
 
 MENSEN = {
     421: "Mensa Arcisstr.",
@@ -17,7 +19,19 @@ MENSEN = {
     412: "Mensa Martinsried",
     423: "Mensa Weihenstephan",
     432: "Mensa Pasing",
-    424: "StuBistro Oettingenstr."
+
+    450: "StuBistro Arcisstr.",
+    418: "StuBistro Goethestr.",
+    455: "StuBistro Akademiestr.",
+    415: "StuBistro Martinsried",
+    416: "StuBistro Schellingstr.",
+    424: "StuBistro Oettingenstr.",
+
+    512: "StuCafé Adalbertstr.",
+    526: "StuCafé Akademie",
+    527: "StuCafé Bolzmannstr.",
+    524: "StuCafé Garching",
+    532: "StuCafé Karlstr."
 }
 
 MEAL_URL_TEMPLATE = "https://www.studentenwerk-muenchen.de/mensa/speiseplan/speiseplan_{date}_{id}_-de.html"
@@ -28,6 +42,7 @@ class Category(Enum):
     PORK = ("🐷",)
     VEGGY = ("🥕",)
     VEGAN = ("🥑",)
+    FISH = ("🐟",)
 
     def __init__(self, emoji):
         self.emoji = emoji
@@ -40,10 +55,14 @@ class Meal:
     def __init__(self, name: str, typ: str):
         self.name = name
         self.categories = set()
+        self.allergens = set()
         self.typ = typ
 
     def add_category(self, category: Category):
         self.categories.add(category)
+
+    def add_allergens(self, allergens):
+        self.allergens.update(allergens)
 
     def is_meatless(self):
         return (Category.VEGAN in self.categories) or (Category.VEGGY in self.categories)
@@ -95,7 +114,7 @@ class Menu:
         if filter_mode == "none" or filter_mode == "vegetarian":
             out += "\n🥑 = vegan, 🥕 = vegetarisch"
         if filter_mode == "none":
-            out += "\n🐷 = Schwein, 🐄 = Rind"
+            out += "\n🐷 = Schwein, 🐄 = Rind, 🐟 = Fisch"
 
         return out
 
@@ -104,9 +123,36 @@ class Menu:
 
 
 class MenuManager:
+    """Responsible for retrieving menus. Caches up to 20 entries for up to 1 hour."""
+
+    def __init__(self):
+        self.cache = ExpiringDict(max_len=20, max_age_seconds=60 * 60)
+
+    def clear_cache(self):
+        self.cache.clear()
+
+    def get_menu(self, mensa_id: int):
+        initial_day = self.get_day()
+        # cache is indexed by mensa and initial day
+        cache_key = (mensa_id, initial_day.isoformat())
+
+        menu, age = self.cache.get(cache_key, default=None, with_age=True)
+        if menu:
+            # cache hit
+            print(f"Using cached menu, age: {age:.0f} seconds")
+            return menu
+
+        # cache miss
+        content, day = self.download_menu(mensa_id, initial_day)
+        if content is None:
+            return None
+        # store in cache
+        menu = self.parse_menu(content, mensa_id, day)
+        self.cache[cache_key] = menu
+        return menu
 
     @staticmethod
-    def download_next_menu(mensa_id):
+    def get_day():
         now = datetime.now()
         day = date.today()
 
@@ -118,10 +164,15 @@ class MenuManager:
             # afternoon during workdays
             # show next day
             day += timedelta(days=1)
+        return day
+
+    @staticmethod
+    def download_menu(mensa_id: int, initial_day: date):
+        day = initial_day
 
         for _ in range(20):
             url = MEAL_URL_TEMPLATE.format(date=day.isoformat(), id=mensa_id)
-            print("downloading", url)
+            logging.debug(f"Downloading {url}")
             r = requests.get(url)
 
             if r.status_code == 200:
@@ -133,8 +184,8 @@ class MenuManager:
                 r.raise_for_status()
         return None, None
 
-    def get_menu(self, mensa_id: int):
-        content, day = self.download_next_menu(mensa_id)
+    @staticmethod
+    def parse_menu(content: bytes, mensa_id: int, day: date):
         soup = BeautifulSoup(content, "lxml")
 
         menu = Menu(mensa_id, day.strftime("%d.%m.%Y"))
@@ -156,11 +207,21 @@ class MenuManager:
                 if "fleischlos" in icons[0]["class"]:
                     meal.add_category(Category.VEGGY)
 
-            sup = meal_tag.select(".u-text-sup")
-            if len(sup) > 0:
-                if "S" in sup[0].text:
+            sup_type = meal_tag.select_one(".c-schedule__marker--type .u-text-sup")
+            if sup_type:
+                if "S" in sup_type.text:
                     meal.add_category(Category.PORK)
-                if "R" in sup[0].text:
+                if "R" in sup_type.text:
                     meal.add_category(Category.BEEF)
+
+            sup_allergen = meal_tag.select_one(".c-schedule__marker--allergen .u-text-sup")
+            if sup_allergen:
+                allergen_str: str = sup_allergen.text[1:-1]  # remove square brackets
+                meal.add_allergens(allergen_str.split(","))
+
+                # exclude fish label from salad buffet since it's misleading
+                if "Fi" in meal.allergens and "Salatbar" not in mealname:
+                    meal.add_category(Category.FISH)
+
             menu.add_meal(meal)
         return menu
