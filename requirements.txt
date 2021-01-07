@@ -6,7 +6,7 @@ cryptography==2.8
 expiringdict==1.2.0
 future==0.18.2
 idna==2.8
-lxml==4.4.1
+lxml==4.6.2
 pycparser==2.19
 python-telegram-bot==12.2.0
 requests==2.22.0
