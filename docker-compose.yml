@@ -2,7 +2,7 @@ version: "3"
 services:
   tummensabot:
     image: docker.pkg.github.com/alwinius/tummensabot/tummensabot:latest
-    restart: on-failure
+    restart: always
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     ports:
@@ -12,6 +12,7 @@ services:
       - ${PWD}/config.ini:/app/config.ini
   watchtower:
     image: containrrr/watchtower:0.3.9
+    restart: always
     environment:
       - REPO_USER=${GITHUB_USER}
       - REPO_PASS=${GITHUB_TOKEN}
