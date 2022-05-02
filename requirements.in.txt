@@ -1,0 +1,6 @@
+beautifulsoup4
+expiringdict
+python-telegram-bot==12.*
+requests
+SQLAlchemy
+lxml
