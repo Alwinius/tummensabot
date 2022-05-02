@@ -11,6 +11,7 @@ from enum import Enum
 import requests
 from bs4 import BeautifulSoup
 from expiringdict import ExpiringDict
+from telegram.utils.helpers import escape_markdown
 
 MENSEN = {
     421: "Mensa Arcisstr.",
@@ -109,7 +110,7 @@ class Menu:
             if meal.typ != last_typ:
                 out += f"\n*{meal.typ}*:"
                 last_typ = meal.typ
-            out += "\n" + str(meal)
+            out += "\n" + escape_markdown(str(meal))
 
         if filter_mode == "none" or filter_mode == "vegetarian":
             out += "\n🥑 = vegan, 🥕 = vegetarisch"
