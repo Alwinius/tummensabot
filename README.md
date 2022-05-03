@@ -2,7 +2,7 @@
 
 ## Setup
 
-* requires python 3.6 or above
+* requires python 3.7 or above
 * install dependencies: `pip install -r requirements.txt`
 * copy `config.example.ini` to `config.ini` and enter bot details
 
