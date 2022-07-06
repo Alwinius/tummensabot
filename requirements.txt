@@ -7,7 +7,7 @@ decorator==5.1.1
 expiringdict==1.2.1
 greenlet==1.1.2
 idna==3.3
-lxml==4.8.0
+lxml==4.9.1
 pycparser==2.21
 python-telegram-bot==12.8
 requests==2.27.1
